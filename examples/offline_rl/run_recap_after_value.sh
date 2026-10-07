@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 # Continue the RLinf RECAP reproduction after the currently running Value Model
-# reaches step 18,000:
+# reaches step 6,000:
 #   1. select the best saved checkpoint by validation ranking quality;
 #   2. compute advantage labels for SFT + rollout data on GPUs 0-3;
 #   3. verify both label files;
-#   4. train the CFG-conditioned pi0.5 policy for 30,000 steps on GPUs 0-3.
+#   4. train the CFG-conditioned pi0.5 policy for 10,000 steps on GPUs 0-3.
 #   5. evaluate the final CFG checkpoint on all 50 LIBERO-10 Task-0 states.
 
 set -Eeuo pipefail
@@ -13,11 +13,11 @@ set -Eeuo pipefail
 REPO_PATH="/pfs/pfs-oHNwH0/lqb/vla_rl/RLinf"
 ENV_PATH="/pfs/pfs-oHNwH0/lqb/miniconda3/envs/rlinf_recap"
 WANDB_ENV_FILE="/pfs/pfs-oHNwH0/lqb/.config/wandb/api_key.env"
-VALUE_PID="2447343"
-VALUE_RUN_DIR="${REPO_PATH}/logs/value_sft/repro_recap_value_model_sft-20261007-19:56:06"
-VALUE_EXPERIMENT="recap_value_sft_rollout_task0_18k"
+VALUE_PID="${VALUE_PID:-}"
+VALUE_RUN_DIR="${VALUE_RUN_DIR:?VALUE_RUN_DIR must point to the completed Value run}"
+VALUE_EXPERIMENT="recap_value_sft_rollout_task0_6k"
 VALUE_CHECKPOINT_ROOT="${VALUE_RUN_DIR}/${VALUE_EXPERIMENT}/checkpoints"
-VALUE_FINAL_WEIGHTS="${VALUE_CHECKPOINT_ROOT}/global_step_18000/actor/model_state_dict/full_weights.pt"
+VALUE_FINAL_WEIGHTS="${VALUE_CHECKPOINT_ROOT}/global_step_6000/actor/model_state_dict/full_weights.pt"
 VALUE_LOG="${VALUE_RUN_DIR}/run_value_sft.log"
 VALUE_EVAL_DIR="${VALUE_RUN_DIR}/checkpoint_eval"
 
@@ -45,14 +45,16 @@ on_error() {
 }
 trap on_error ERR
 
-echo "[$(timestamp)] Waiting for Value Model PID ${VALUE_PID} to finish."
+echo "[$(timestamp)] Checking completed Value Model run ${VALUE_RUN_DIR}."
 echo "[$(timestamp)] Expected final checkpoint: ${VALUE_FINAL_WEIGHTS}"
 
-while kill -0 "${VALUE_PID}" 2>/dev/null; do
-    sleep 60
-done
+if [[ -n "${VALUE_PID}" ]]; then
+    while kill -0 "${VALUE_PID}" 2>/dev/null; do
+        sleep 60
+    done
+fi
 
-[[ -s "${VALUE_FINAL_WEIGHTS}" ]] || fail "The step-18000 Value Model checkpoint is missing or empty. Downstream stages will not start."
+[[ -s "${VALUE_FINAL_WEIGHTS}" ]] || fail "The step-6000 Value Model checkpoint is missing or empty. Downstream stages will not start."
 
 if tail -n 4000 "${VALUE_LOG}" | grep -Eq 'Traceback|Error executing job|CUDA out of memory'; then
     fail "The Value Model log contains a fatal error near the end."
@@ -129,39 +131,30 @@ for path in sys.argv[1:]:
 PY
 
 echo "[$(timestamp)] Advantage-label verification passed."
-echo "[$(timestamp)] Stage 4/5: starting pi0.5 CFG training for 30,000 optimizer steps."
+echo "[$(timestamp)] Stage 4/4: starting pi0.5 CFG training for 10,000 optimizer steps."
 
-CFG_RUN_DIR="${REPO_PATH}/logs/cfg_rl/repro_cfg_rl_openpi-performance-$(date +'%Y%m%d-%H%M%S')"
-CFG_EXPERIMENT="recap_cfg_task0_performance"
+CFG_RUN_DIR="${REPO_PATH}/logs/cfg_rl/repro_cfg_rl_openpi-quick-$(date +'%Y%m%d-%H%M%S')"
+CFG_EXPERIMENT="recap_cfg_task0_quick_10k"
 
 bash examples/offline_rl/policy_optimization/cfg_rl/run_cfg_rl.sh \
     repro_cfg_rl_openpi \
     "data.advantage_tag=${ADVANTAGE_TAG}" \
     "runner.logger.log_path=${CFG_RUN_DIR}" \
     "runner.logger.experiment_name=${CFG_EXPERIMENT}" \
-    "runner.max_steps=30000" \
-    "runner.save_interval=3000" \
-    "actor.optim.total_training_steps=30000"
+    "runner.max_steps=10000" \
+    "runner.save_interval=2000" \
+    "actor.optim.lr_warmup_steps=1000" \
+    "actor.optim.total_training_steps=10000"
 
-CFG_CHECKPOINT="${CFG_RUN_DIR}/${CFG_EXPERIMENT}/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt"
+CFG_CHECKPOINT="${CFG_RUN_DIR}/${CFG_EXPERIMENT}/checkpoints/global_step_10000/actor/model_state_dict/full_weights.pt"
 [[ -s "${CFG_CHECKPOINT}" ]] || fail "The final CFG checkpoint is missing or empty: ${CFG_CHECKPOINT}"
 
 echo "[$(timestamp)] CFG training completed and final checkpoint verification passed."
-echo "[$(timestamp)] Stage 5/5: evaluating LIBERO-10 Task 0 on all 50 official initial states."
+echo "[$(timestamp)] Evaluating LIBERO-10 Task 0 on all 50 official initial states."
 
-bash evaluations/run_eval.sh libero libero_10_openpi_pi05_eval \
+bash evaluations/run_eval.sh libero repro_recap_cfg_task0_eval \
     "runner.ckpt_path=${CFG_CHECKPOINT}" \
-    "runner.logger.experiment_name=recap_cfg_task0_eval" \
-    "+env.eval.task_id_filter=[0]" \
-    "env.eval.total_num_envs=50" \
-    "env.eval.rollout_epoch=1" \
-    "rollout.model.model_path=/pfs/pfs-oHNwH0/lqb/models/pi05_base_openpi" \
-    "rollout.model.model_type=cfg_model" \
-    "rollout.model.openpi.config_name=pi05_libero" \
-    "rollout.model.openpi.train_expert_only=false" \
-    "+rollout.model.openpi.guidance_type=positive" \
-    "+rollout.model.openpi.positive_only_conditional=true" \
-    "+rollout.model.openpi.cfgrl_guidance_scale=1.0"
+    "env.eval.rollout_epoch=1"
 
 echo "[$(timestamp)] RECAP training and Task-0 evaluation completed successfully."
 echo "[$(timestamp)] Final CFG checkpoint: ${CFG_CHECKPOINT}"

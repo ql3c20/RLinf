@@ -5,7 +5,7 @@ RLINF_ROOT=/pfs/pfs-oHNwH0/lqb/vla_rl/RLinf
 PYTHON_BIN=/pfs/pfs-oHNwH0/lqb/miniconda3/envs/rlinf_recap/bin/python
 WANDB_ENV_FILE=/pfs/pfs-oHNwH0/lqb/.config/wandb/api_key.env
 RUN_STAMP="$(date +%Y%m%d-%H:%M:%S)"
-RUN_DIR="$RLINF_ROOT/logs/value_sft/repro_recap_value_model_sft-$RUN_STAMP"
+RUN_DIR="${RUN_DIR_OVERRIDE:-$RLINF_ROOT/logs/value_sft/repro_recap_value_model_sft-$RUN_STAMP}"
 
 mkdir -p "$RUN_DIR"
 cd "$RLINF_ROOT"
@@ -24,9 +24,16 @@ if [[ -r "$WANDB_ENV_FILE" ]]; then
 fi
 
 echo "$RUN_DIR" > /pfs/pfs-oHNwH0/lqb/vla_rl/RLinf/logs/value_sft/current_mixed_run_dir.txt
-exec "$PYTHON_BIN" \
-  examples/offline_rl/advantage_labeling/recap/train_value.py \
-  --config-path "$RLINF_ROOT/examples/offline_rl/config" \
-  --config-name repro_recap_value_model_sft \
-  "runner.logger.log_path=$RUN_DIR" \
-  >"$RUN_DIR/run_value_sft.log" 2>&1
+cmd=(
+  "$PYTHON_BIN"
+  examples/offline_rl/advantage_labeling/recap/train_value.py
+  --config-path "$RLINF_ROOT/examples/offline_rl/config"
+  --config-name repro_recap_value_model_sft
+  "runner.logger.log_path=$RUN_DIR"
+)
+
+if [[ "${VALUE_TEE:-0}" == "1" ]]; then
+  "${cmd[@]}" 2>&1 | tee "$RUN_DIR/run_value_sft.log"
+else
+  exec "${cmd[@]}" >"$RUN_DIR/run_value_sft.log" 2>&1
+fi
