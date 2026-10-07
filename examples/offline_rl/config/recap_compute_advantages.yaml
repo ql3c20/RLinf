@@ -41,6 +41,10 @@ data:
 
   advantage_lookahead_step: 10
   gamma: 1.0
+  # Keep reward normalization on the same scale used to train the SFT-only
+  # value model. Rollout returns below -457 are intentionally extrapolated.
+  return_min: -457.0
+  return_max: 0.0
 
 distributed:
   enabled: true
