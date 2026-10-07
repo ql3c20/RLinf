@@ -27,7 +27,7 @@ runner:
     logger_backends: ["tensorboard", "wandb"]
 
   max_epochs: 30000
-  max_steps: -1
+  max_steps: 30000
   val_check_interval: -1
   save_interval: 3000
 

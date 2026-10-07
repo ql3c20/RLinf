@@ -8,6 +8,8 @@ data:
       type: sft
     - dataset_path: /pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_train
       type: rollout
+    - dataset_path: /pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_eval
+      type: rollout
 
   dataset_type: "sft"
   gamma: 1.0
