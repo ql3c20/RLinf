@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-path", type=Path, required=True)
     parser.add_argument("--config-name", default="repro_recap_value_model_sft")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--eval-subset-name", default="configured_eval")
     parser.add_argument("--spearman-tolerance", type=float, default=0.005)
     return parser.parse_args()
 
@@ -132,13 +133,13 @@ def main() -> None:
         marker = "SELECTED" if item is selected else "candidate"
         print(
             f"[{marker}] step={item['checkpoint_step']} "
-            f"success_eval_spearman={item['spearman']:.6f} "
-            f"success_eval_mae={item['mae']:.6f} "
-            f"success_eval_loss={item['loss']:.6f}",
+            f"eval_spearman={item['spearman']:.6f} "
+            f"eval_mae={item['mae']:.6f} "
+            f"eval_loss={item['loss']:.6f}",
             file=sys.stderr,
         )
 
-    summary_path = args.output / "success_eval_metrics.json"
+    summary_path = args.output / "eval_metrics.json"
     summary_path.write_text(
         json.dumps(
             {"candidates": candidates, "selected": selected},
@@ -153,7 +154,7 @@ def main() -> None:
     (args.checkpoint_root / "selected_value_checkpoint.txt").write_text(
         f"checkpoint={selected_model_dir}\n"
         f"step={selected['checkpoint_step']}\n"
-        "eval_subset=task0_success_only_27\n"
+        f"eval_subset={args.eval_subset_name}\n"
         f"eval_value_spearman={selected['spearman']:.9f}\n"
         f"eval_mae={selected['mae']:.9f}\n"
         f"eval_loss={selected['loss']:.9f}\n",

@@ -12,13 +12,13 @@ set -Eeuo pipefail
 
 REPO_PATH="/pfs/pfs-oHNwH0/lqb/vla_rl/RLinf"
 ENV_PATH="/pfs/pfs-oHNwH0/lqb/miniconda3/envs/rlinf_recap"
-VALUE_PID="3753869"
-VALUE_RUN_DIR="${REPO_PATH}/logs/value_sft/repro_recap_value_model_sft-20261007-14:27:38"
-VALUE_EXPERIMENT="recap_value_sft_only_task0_18k"
+VALUE_PID="2339453"
+VALUE_RUN_DIR="${REPO_PATH}/logs/value_sft/repro_recap_value_model_sft-20261007-19:45:14"
+VALUE_EXPERIMENT="recap_value_sft_rollout_task0_18k"
 VALUE_CHECKPOINT_ROOT="${VALUE_RUN_DIR}/${VALUE_EXPERIMENT}/checkpoints"
 VALUE_FINAL_WEIGHTS="${VALUE_CHECKPOINT_ROOT}/global_step_18000/actor/model_state_dict/full_weights.pt"
 VALUE_LOG="${VALUE_RUN_DIR}/run_value_sft.log"
-VALUE_SUCCESS_EVAL_DIR="${VALUE_RUN_DIR}/success_only_eval"
+VALUE_EVAL_DIR="${VALUE_RUN_DIR}/checkpoint_eval"
 
 SFT_DATA="/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_sft"
 ROLLOUT_DATA="/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_train"
@@ -71,15 +71,15 @@ mkdir -p "${HF_HOME}" "${HF_DATASETS_CACHE}" "${TRANSFORMERS_CACHE}" "${TMPDIR}"
 
 cd "${REPO_PATH}"
 
-# Re-evaluate every saved checkpoint on the 27 held-out successful Task-0
-# episodes. The mixed success/failure metrics logged during training remain a
-# diagnostic only and do not drive Step-3 checkpoint selection.
+# Re-evaluate every saved checkpoint on the held-out mixed Task-0 eval set
+# (27 successful and 37 failed episodes), then select by ranking quality.
 VALUE_CHECKPOINT="$({
 python examples/offline_rl/advantage_labeling/recap/evaluate_value_checkpoints.py \
     --checkpoint-root "${VALUE_CHECKPOINT_ROOT}" \
     --repo-path "${REPO_PATH}" \
     --config-name repro_recap_value_model_sft \
-    --output "${VALUE_SUCCESS_EVAL_DIR}"
+    --output "${VALUE_EVAL_DIR}" \
+    --eval-subset-name task0_mixed_success_failure_64
 } 2> >(tee -a "${PIPELINE_LOG}" >&2))"
 
 [[ -s "${VALUE_CHECKPOINT}/full_weights.pt" ]] || fail "Selected Value Model checkpoint is invalid: ${VALUE_CHECKPOINT}"
