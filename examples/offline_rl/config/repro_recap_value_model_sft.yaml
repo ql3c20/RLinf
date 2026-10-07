@@ -30,6 +30,8 @@ runner:
   max_steps: 18000
   val_check_interval: 500
   save_interval: 3000
+  eval_only: false
+  resume_dir: null
 
 data:
   # Must match Step 1's data.tag; loads meta/returns_{tag}.parquet (null = legacy meta/returns.parquet)
@@ -44,6 +46,11 @@ data:
 
   eval_data_paths:
     - dataset_path: "/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_eval"
+      name: "task0_success_only_27"
+      # Held-out successful trajectories only. The Value Model is trained as a
+      # success-conditioned progress estimator; failed trajectories remain an
+      # OOD diagnostic and must not drive checkpoint selection.
+      episode_indices: [1, 2, 4, 8, 9, 10, 11, 12, 16, 18, 22, 25, 28, 32, 33, 40, 43, 44, 46, 48, 52, 54, 55, 57, 58, 59, 63]
       max_samples: 10000
       robot_type: "libero"
       model_type: "pi05"

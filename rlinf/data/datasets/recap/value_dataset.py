@@ -214,6 +214,7 @@ class ValueDataset(Dataset):
         normalize_to_minus_one_zero: bool = True,
         max_samples: Optional[int] = None,
         tag: Optional[str] = None,
+        episode_indices: Optional[list[int]] = None,
         episode_percentage: Optional[float] = None,
         shuffle_episodes: bool = False,
         episode_seed: int = 42,
@@ -265,7 +266,37 @@ class ValueDataset(Dataset):
             )
 
         self._indices = None
-        if episode_percentage is not None and episode_percentage < 100:
+        if episode_indices is not None and episode_percentage is not None:
+            raise ValueError(
+                "Set only one of episode_indices and episode_percentage."
+            )
+
+        if episode_indices is not None:
+            total = self.dataset_meta.total_episodes
+            selected_list = [int(ep) for ep in episode_indices]
+            if not selected_list:
+                raise ValueError("episode_indices must not be empty")
+            if len(selected_list) != len(set(selected_list)):
+                raise ValueError("episode_indices contains duplicate episode IDs")
+            invalid = [ep for ep in selected_list if ep < 0 or ep >= total]
+            if invalid:
+                raise ValueError(
+                    f"episode_indices contains out-of-range IDs {invalid}; "
+                    f"dataset has {total} episodes"
+                )
+            ep_starts, ep_ends = episode_boundaries(self._base)
+            self._indices = [
+                i
+                for ep in sorted(selected_list)
+                for i in range(ep_starts[ep], ep_ends[ep])
+            ]
+            logger.info(
+                "ValueDataset selected %d/%d explicit episodes: %s",
+                len(selected_list),
+                total,
+                sorted(selected_list),
+            )
+        elif episode_percentage is not None and episode_percentage < 100:
             if episode_percentage <= 0:
                 raise ValueError(
                     f"episode_percentage must be > 0, got {episode_percentage}"

@@ -327,6 +327,7 @@ class FSDPValueSftWorker(FSDPModelManager, Worker):
                 "split": "train",
                 "default_prompt": entry.get("default_prompt", None),
                 "max_samples": entry.get("max_samples", None),
+                "episode_indices": entry.get("episode_indices", None),
                 "episode_percentage": entry.get("episode_percentage", None),
                 "shuffle_episodes": entry.get("shuffle_episodes", False),
                 "episode_seed": entry.get("episode_seed", 42),
@@ -421,6 +422,7 @@ class FSDPValueSftWorker(FSDPModelManager, Worker):
                 action_dim=eval_entry.get("action_dim", shared["action_dim"]),
                 default_prompt=eval_entry.get("default_prompt", None),
                 max_samples=eval_max_samples,
+                episode_indices=eval_entry.get("episode_indices", None),
                 tag=data_cfg.get("tag", None),
             )
             eval_sampler = None

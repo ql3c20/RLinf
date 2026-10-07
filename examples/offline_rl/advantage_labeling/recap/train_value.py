@@ -52,7 +52,16 @@ def main(cfg) -> None:
 
     runner = SFTRunner(cfg=cfg, actor=actor_group)
     runner.init_workers()
-    runner.run()
+    if cfg.runner.get("eval_only", False):
+        eval_metrics = actor_group.run_eval().wait()
+        rank_zero_metrics = (
+            eval_metrics[0]
+            if isinstance(eval_metrics, (list, tuple)) and eval_metrics
+            else {}
+        )
+        print("__VALUE_EVAL_JSON__" + json.dumps(rank_zero_metrics, sort_keys=True))
+    else:
+        runner.run()
 
 
 if __name__ == "__main__":

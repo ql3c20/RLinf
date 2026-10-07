@@ -18,7 +18,7 @@ VALUE_EXPERIMENT="recap_value_sft_only_task0_18k"
 VALUE_CHECKPOINT_ROOT="${VALUE_RUN_DIR}/${VALUE_EXPERIMENT}/checkpoints"
 VALUE_FINAL_WEIGHTS="${VALUE_CHECKPOINT_ROOT}/global_step_18000/actor/model_state_dict/full_weights.pt"
 VALUE_LOG="${VALUE_RUN_DIR}/run_value_sft.log"
-VALUE_TENSORBOARD_DIR="${VALUE_RUN_DIR}/tensorboard"
+VALUE_SUCCESS_EVAL_DIR="${VALUE_RUN_DIR}/success_only_eval"
 
 SFT_DATA="/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_sft"
 ROLLOUT_DATA="/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_train"
@@ -71,84 +71,15 @@ mkdir -p "${HF_HOME}" "${HF_DATASETS_CACHE}" "${TRANSFORMERS_CACHE}" "${TMPDIR}"
 
 cd "${REPO_PATH}"
 
-# Spearman is the primary model-selection metric because Step 3 uses value
-# ranking to identify the top-30% samples. To avoid choosing a checkpoint for a
-# negligible noisy Spearman gain, checkpoints within 0.005 of the best
-# Spearman are treated as tied and the lower validation MAE wins.
+# Re-evaluate every saved checkpoint on the 27 held-out successful Task-0
+# episodes. The mixed success/failure metrics logged during training remain a
+# diagnostic only and do not drive Step-3 checkpoint selection.
 VALUE_CHECKPOINT="$({
-python - "${VALUE_CHECKPOINT_ROOT}" "${VALUE_TENSORBOARD_DIR}" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-
-checkpoint_root = Path(sys.argv[1])
-tensorboard_dir = Path(sys.argv[2])
-spearman_tolerance = 0.005
-
-checkpoints = []
-for path in checkpoint_root.glob("global_step_*"):
-    match = re.fullmatch(r"global_step_(\d+)", path.name)
-    weights = path / "actor" / "model_state_dict" / "full_weights.pt"
-    if match and weights.is_file() and weights.stat().st_size > 0:
-        checkpoints.append((int(match.group(1)), path))
-if not checkpoints:
-    raise RuntimeError(f"No complete checkpoints found under {checkpoint_root}")
-
-events = EventAccumulator(str(tensorboard_dir), size_guidance={"scalars": 0})
-events.Reload()
-required_tags = ("eval/value_spearman", "eval/mae", "eval/loss")
-available = set(events.Tags().get("scalars", []))
-missing = set(required_tags).difference(available)
-if missing:
-    raise RuntimeError(f"Missing TensorBoard validation metrics: {sorted(missing)}")
-
-series = {tag: {event.step: event.value for event in events.Scalars(tag)} for tag in required_tags}
-candidates = []
-for checkpoint_step, checkpoint_path in sorted(checkpoints):
-    # RLinf saves global_step=N but logs that iteration with zero-based step N-1.
-    metric_step = checkpoint_step - 1
-    if all(metric_step in series[tag] for tag in required_tags):
-        candidates.append(
-            {
-                "checkpoint_step": checkpoint_step,
-                "checkpoint_path": checkpoint_path,
-                "spearman": series["eval/value_spearman"][metric_step],
-                "mae": series["eval/mae"][metric_step],
-                "loss": series["eval/loss"][metric_step],
-            }
-        )
-if not candidates:
-    raise RuntimeError("No saved checkpoint has matching validation metrics")
-
-best_spearman = max(item["spearman"] for item in candidates)
-near_best = [
-    item for item in candidates
-    if item["spearman"] >= best_spearman - spearman_tolerance
-]
-selected = min(near_best, key=lambda item: (item["mae"], item["loss"], item["checkpoint_step"]))
-
-for item in candidates:
-    marker = "SELECTED" if item is selected else "candidate"
-    print(
-        f"[{marker}] step={item['checkpoint_step']} "
-        f"eval_spearman={item['spearman']:.6f} "
-        f"eval_mae={item['mae']:.6f} eval_loss={item['loss']:.6f}",
-        file=sys.stderr,
-    )
-
-selected_model_dir = selected["checkpoint_path"] / "actor" / "model_state_dict"
-(checkpoint_root / "selected_value_checkpoint.txt").write_text(
-    f"checkpoint={selected_model_dir}\n"
-    f"step={selected['checkpoint_step']}\n"
-    f"eval_value_spearman={selected['spearman']:.9f}\n"
-    f"eval_mae={selected['mae']:.9f}\n"
-    f"eval_loss={selected['loss']:.9f}\n",
-    encoding="utf-8",
-)
-print(selected_model_dir)
-PY
+python examples/offline_rl/advantage_labeling/recap/evaluate_value_checkpoints.py \
+    --checkpoint-root "${VALUE_CHECKPOINT_ROOT}" \
+    --repo-path "${REPO_PATH}" \
+    --config-name repro_recap_value_model_sft \
+    --output "${VALUE_SUCCESS_EVAL_DIR}"
 } 2> >(tee -a "${PIPELINE_LOG}" >&2))"
 
 [[ -s "${VALUE_CHECKPOINT}/full_weights.pt" ]] || fail "Selected Value Model checkpoint is invalid: ${VALUE_CHECKPOINT}"
