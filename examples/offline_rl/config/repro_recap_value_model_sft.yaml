@@ -23,7 +23,7 @@ runner:
   logger:
     log_path: "/pfs/pfs-oHNwH0/lqb/results/recap"
     project_name: "rlinf-vla-posttrain"
-    experiment_name: "recap_value_sft_task0"
+    experiment_name: "recap_value_sft_only_task0"
     logger_backends: ["tensorboard", "wandb"]
 
   max_epochs: 30000
@@ -38,11 +38,6 @@ data:
   train_data_paths:
     - dataset_path: "/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_sft"
       type: "sft"
-      weight: 1.0
-      robot_type: "libero"
-      model_type: "pi05"
-    - dataset_path: "/pfs/pfs-oHNwH0/lqb/datasets/RECAP-Libero10-Task0-48succ-Data-git/libero10_task0_train"
-      type: "rollout"
       weight: 1.0
       robot_type: "libero"
       model_type: "pi05"
