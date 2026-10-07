@@ -3,6 +3,7 @@ set -euo pipefail
 
 RLINF_ROOT=/pfs/pfs-oHNwH0/lqb/vla_rl/RLinf
 PYTHON_BIN=/pfs/pfs-oHNwH0/lqb/miniconda3/envs/rlinf_recap/bin/python
+WANDB_ENV_FILE=/pfs/pfs-oHNwH0/lqb/.config/wandb/api_key.env
 RUN_STAMP="$(date +%Y%m%d-%H:%M:%S)"
 RUN_DIR="$RLINF_ROOT/logs/value_sft/repro_recap_value_model_sft-$RUN_STAMP"
 
@@ -17,6 +18,10 @@ export HF_DATASETS_CACHE=/pfs/pfs-oHNwH0/lqb/cache/huggingface/datasets
 export TRANSFORMERS_CACHE=/pfs/pfs-oHNwH0/lqb/cache/transformers
 export TMPDIR=/pfs/pfs-oHNwH0/lqb/tmp
 export CUDA_VISIBLE_DEVICES=0,1,2,3
+if [[ -r "$WANDB_ENV_FILE" ]]; then
+  # Kept outside the repository with mode 600; never commit API credentials.
+  source "$WANDB_ENV_FILE"
+fi
 
 echo "$RUN_DIR" > /pfs/pfs-oHNwH0/lqb/vla_rl/RLinf/logs/value_sft/current_mixed_run_dir.txt
 exec "$PYTHON_BIN" \

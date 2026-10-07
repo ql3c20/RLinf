@@ -12,8 +12,9 @@ set -Eeuo pipefail
 
 REPO_PATH="/pfs/pfs-oHNwH0/lqb/vla_rl/RLinf"
 ENV_PATH="/pfs/pfs-oHNwH0/lqb/miniconda3/envs/rlinf_recap"
-VALUE_PID="2339453"
-VALUE_RUN_DIR="${REPO_PATH}/logs/value_sft/repro_recap_value_model_sft-20261007-19:45:14"
+WANDB_ENV_FILE="/pfs/pfs-oHNwH0/lqb/.config/wandb/api_key.env"
+VALUE_PID="2447343"
+VALUE_RUN_DIR="${REPO_PATH}/logs/value_sft/repro_recap_value_model_sft-20261007-19:56:06"
 VALUE_EXPERIMENT="recap_value_sft_rollout_task0_18k"
 VALUE_CHECKPOINT_ROOT="${VALUE_RUN_DIR}/${VALUE_EXPERIMENT}/checkpoints"
 VALUE_FINAL_WEIGHTS="${VALUE_CHECKPOINT_ROOT}/global_step_18000/actor/model_state_dict/full_weights.pt"
@@ -60,6 +61,10 @@ fi
 echo "[$(timestamp)] Value Model finished and checkpoint verification passed."
 
 source "${ENV_PATH}/bin/activate"
+if [[ -r "${WANDB_ENV_FILE}" ]]; then
+    # Kept outside the repository with mode 600; never commit API credentials.
+    source "${WANDB_ENV_FILE}"
+fi
 export REPO_PATH
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 export HF_HOME="/pfs/pfs-oHNwH0/lqb/cache/huggingface"
