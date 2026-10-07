@@ -30,7 +30,7 @@ runner:
   max_steps: 300
 
   only_eval: False
-  val_check_interval: 100
+  val_check_interval: -1
   save_interval: 100
 
   resume_dir: null # Optional: path to a saved checkpoint directory, such as 'checkpoints/global_step_10'. If not None, it will be used to resume training.
@@ -106,7 +106,7 @@ actor:
   group_name: "ActorGroup"
   training_backend: "fsdp"
   micro_batch_size: 64
-  global_batch_size: 256
+  global_batch_size: 512
   seed: 42
   enable_offload: True
 
