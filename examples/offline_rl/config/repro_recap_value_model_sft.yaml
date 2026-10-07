@@ -23,11 +23,11 @@ runner:
   logger:
     log_path: "/pfs/pfs-oHNwH0/lqb/results/recap"
     project_name: "rlinf-vla-posttrain"
-    experiment_name: "recap_value_sft_only_task0"
+    experiment_name: "recap_value_sft_only_task0_18k"
     logger_backends: ["tensorboard", "wandb"]
 
   max_epochs: 30000
-  max_steps: 8000
+  max_steps: 18000
   val_check_interval: 500
   save_interval: 3000
 
@@ -93,7 +93,7 @@ actor:
     clip_grad: 1.0
     lr_scheduler: "constant"
     lr_warmup_steps: 500
-    total_training_steps: 8000
+    total_training_steps: 18000
 
   fsdp_config:
     strategy: "fsdp"
